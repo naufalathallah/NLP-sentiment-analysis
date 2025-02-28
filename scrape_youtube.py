@@ -15,7 +15,7 @@ service = Service("/usr/bin/chromedriver")
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 # URL Video YouTube yang ingin di-scrape
-video_url = "https://www.youtube.com/watch?v=jDKE5f6_T5w"
+video_url = "https://www.youtube.com/watch?v=6Dh-RL__uN4"  # Video dengan banyak komentar
 driver.get(video_url)
 time.sleep(5)  # Tunggu halaman termuat
 
@@ -23,7 +23,11 @@ time.sleep(5)  # Tunggu halaman termuat
 scroll_pause_time = 2
 last_height = driver.execute_script("return document.documentElement.scrollHeight")
 
-while True:
+# Set batas maksimal komentar yang diambil
+MAX_COMMENTS = 3000  
+comments = set()  # Gunakan set untuk menghindari duplikasi
+
+while len(comments) < MAX_COMMENTS:
     driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
     time.sleep(scroll_pause_time)
     
@@ -32,15 +36,16 @@ while True:
         break
     last_height = new_height
 
-# Ambil komentar dari elemen YouTube
-comments = []
-comment_elements = driver.find_elements(By.CSS_SELECTOR, "#content-text")
-
-for comment in comment_elements:
-    comments.append(comment.text)
+    # Ambil komentar dari elemen YouTube
+    comment_elements = driver.find_elements(By.CSS_SELECTOR, "#content-text")
+    
+    for comment in comment_elements:
+        comments.add(comment.text)
+        if len(comments) >= MAX_COMMENTS:
+            break
 
 # Simpan ke file CSV
-df = pd.DataFrame(comments, columns=["Comment"])
+df = pd.DataFrame(list(comments)[:MAX_COMMENTS], columns=["Comment"])
 df.to_csv("/app/youtube_comments.csv", index=False, encoding="utf-8")
 
 print(f"Scraping selesai! Berhasil menyimpan {len(comments)} komentar di youtube_comments.csv")
