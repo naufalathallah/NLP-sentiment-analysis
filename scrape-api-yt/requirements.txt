@@ -1,0 +1,9 @@
+pandas
+numpy
+nltk
+scikit-learn
+textblob
+seaborn
+matplotlib
+requests
+google-api-python-client
