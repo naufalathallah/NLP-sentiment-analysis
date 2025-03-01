@@ -27,3 +27,6 @@ Temporary Items
 
 # macOS folder attributes
 .DS_Store?
+
+# Dataset
+*/dataset
