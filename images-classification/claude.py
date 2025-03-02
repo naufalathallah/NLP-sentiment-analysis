@@ -143,15 +143,13 @@ print("✅ Dataset berhasil dibagi menjadi Train, Validation, dan Test set.")
 # Data augmentation with enhanced transformations
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=40,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    rotation_range=20,         # Kurangi dari 40 menjadi 20
+    width_shift_range=0.1,     # Kurangi dari 0.2 menjadi 0.1
+    height_shift_range=0.1,    # Kurangi dari 0.2 menjadi 0.1
+    shear_range=0.1,           # Kurangi dari 0.2 menjadi 0.1
+    zoom_range=0.1,            # Kurangi dari 0.2 menjadi 0.1
     horizontal_flip=True,
-    brightness_range=[0.8, 1.2],
-    channel_shift_range=0.2,
-    fill_mode='nearest'
+    brightness_range=[0.9, 1.1]  # Kurangi dari [0.8, 1.2] menjadi [0.9, 1.1]
 )
 
 val_datagen = ImageDataGenerator(rescale=1./255)
@@ -193,41 +191,30 @@ print(f"Class mapping: {train_generator.class_indices}")
 
 # Build improved CNN model with batch normalization and regularization
 model = Sequential([
-    # First convolutional block
-    layers.Conv2D(64, (3, 3), padding='same', activation='relu', input_shape=(img_height, img_width, 3),
-                 kernel_regularizer=l2(0.0001)),
-    BatchNormalization(),
-    layers.Conv2D(64, (3, 3), padding='same', activation='relu', kernel_regularizer=l2(0.0001)),
+    # First block
+    layers.Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(img_height, img_width, 3)),
     BatchNormalization(),
     layers.MaxPooling2D((2, 2)),
-    Dropout(0.25),
     
-    # Second convolutional block
-    layers.Conv2D(128, (3, 3), padding='same', activation='relu', kernel_regularizer=l2(0.0001)),
-    BatchNormalization(),
-    layers.Conv2D(128, (3, 3), padding='same', activation='relu', kernel_regularizer=l2(0.0001)),
+    # Second block
+    layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
     BatchNormalization(),
     layers.MaxPooling2D((2, 2)),
-    Dropout(0.25),
     
-    # Third convolutional block
-    layers.Conv2D(256, (3, 3), padding='same', activation='relu', kernel_regularizer=l2(0.0001)),
-    BatchNormalization(),
-    layers.Conv2D(256, (3, 3), padding='same', activation='relu', kernel_regularizer=l2(0.0001)),
+    # Third block
+    layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
     BatchNormalization(),
     layers.MaxPooling2D((2, 2)),
-    Dropout(0.25),
     
     # Dense layers
     layers.Flatten(),
-    layers.Dense(512, activation='relu', kernel_regularizer=l2(0.0001)),
-    BatchNormalization(),
+    layers.Dense(256, activation='relu'),
     Dropout(0.5),
     layers.Dense(num_classes, activation='softmax')
 ])
 
-# Learning rate and optimizer
-learning_rate = 0.0001
+# Gunakan learning rate yang lebih tinggi untuk memulai
+learning_rate = 0.001
 optimizer = Adam(learning_rate=learning_rate)
 
 # Compile model
@@ -242,36 +229,42 @@ model.summary()
 
 # Callbacks for training
 early_stopping = EarlyStopping(
-    monitor='val_loss',
-    patience=10,
+    monitor='val_accuracy',  # Monitor accuracy daripada loss
+    patience=15,             # Tambah patience
     restore_best_weights=True,
     verbose=1
 )
 
-checkpoint = ModelCheckpoint(
-    'best_model.h5',
-    monitor='val_accuracy',
-    save_best_only=True,
-    verbose=1
-)
-
 reduce_lr = ReduceLROnPlateau(
-    monitor='val_loss',
-    factor=0.2,
+    monitor='val_accuracy',  # Monitor accuracy daripada loss
+    factor=0.5,              # Less aggressive reduction (0.5 instead of 0.2)
     patience=5,
     min_lr=1e-6,
     verbose=1
 )
 
-callbacks = [early_stopping, checkpoint, reduce_lr]
+callbacks = [early_stopping, reduce_lr]
 
-# Train the model (uncomment to train)
-# history = model.fit(
-#     train_generator,
-#     steps_per_epoch=train_generator.samples // batch_size,
-#     epochs=50,
-#     validation_data=validation_generator,
-#     validation_steps=validation_generator.samples // batch_size,
-#     callbacks=callbacks,
-#     verbose=1
-# )
+# Hitung class weights
+from sklearn.utils.class_weight import compute_class_weight
+
+# Ambil label dari training data
+train_labels = train_generator.classes
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=np.unique(train_labels),
+    y=train_labels
+)
+class_weight_dict = dict(enumerate(class_weights))
+
+# Tambahkan class_weight saat training
+history = model.fit(
+    train_generator,
+    steps_per_epoch=train_generator.samples // batch_size,
+    epochs=50,
+    validation_data=validation_generator,
+    validation_steps=validation_generator.samples // batch_size,
+    callbacks=callbacks,
+    class_weight=class_weight_dict,
+    verbose=1
+)
